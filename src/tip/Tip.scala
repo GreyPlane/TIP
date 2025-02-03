@@ -213,7 +213,7 @@ object Tip extends App {
                 if (!dfo.interprocedural(v)) {
                   FlowSensitiveAnalysis.select(s, v, wcfg).foreach { an =>
                     // run the analysis
-                    log.verb(s"Performing ${an.getClass.getSimpleName}")
+//                    log.verb(s"Performing ${an.getClass.getSimpleName}")
                     val res = an.analyze().asInstanceOf[Map[CfgNode, _]]
                     Output.output(file, DataFlowOutput(s), wcfg.toDot(Output.labeler(res, an.stateAfterNode), Output.dotIder), options.out)
                   }
@@ -244,7 +244,7 @@ object Tip extends App {
                 if (dfo.interprocedural(v)) {
                   FlowSensitiveAnalysis.select(s, v, wcfg).foreach { an =>
                     // run the analysis
-                    log.verb(s"Starting ${an.getClass.getSimpleName}")
+//                    log.verb(s"Starting ${an.getClass.getSimpleName}")
                     val res = an.analyze()
                     val res2 =
                       if (dfo.contextsensitive(v))

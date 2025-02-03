@@ -2,7 +2,7 @@ package tip.analysis
 
 import tip.cfg.CfgOps._
 import tip.cfg.{CfgNode, CfgStmtNode, ProgramCfg}
-import tip.lattices.{MapLattice, SignLattice}
+import tip.lattices.{MapLattice, SignElement, SignLattice}
 import tip.ast.AstNodeData.DeclarationData
 import tip.ast._
 import tip.solvers.FixpointSolvers
@@ -51,15 +51,19 @@ class SimpleSignAnalysis(cfg: ProgramCfg)(implicit declData: DeclarationData) ex
       case id: AIdentifier => env(id)
       case n: ANumber => num(n.value)
       case bin: ABinaryOp =>
+        val isTheSameId = (bin.left, bin.right) match {
+          case (lhs: AIdentifier, rhs: AIdentifier) if declData(lhs) == declData(rhs) => true
+          case _ => false
+        }
         val left = eval(bin.left, env)
         val right = eval(bin.right, env)
         bin.operator match {
           case Eqq => eqq(left, right)
           case GreatThan => gt(left, right)
           case Divide => div(left, right)
-          case Minus => minus(left, right)
+          case Minus => if (isTheSameId) SignElement.Zero else minus(left, right)
           case Plus => plus(left, right)
-          case Times => times(left, right)
+          case Times => if (isTheSameId) SignElement.Pos else times(left, right)
           case _ => ???
         }
       case _: AInput => valuelattice.top
@@ -85,10 +89,10 @@ class SimpleSignAnalysis(cfg: ProgramCfg)(implicit declData: DeclarationData) ex
       case r: CfgStmtNode =>
         r.data match {
           // var declarations
-          case varr: AVarStmt => ??? //<--- Complete here
+          case varr: AVarStmt => s ++ varr.declIds.map(id => id -> statelattice.sublattice.top)
 
           // assignments
-          case AAssignStmt(id: AIdentifier, right, _) => ??? //<--- Complete here
+          case AAssignStmt(id: AIdentifier, right, _) => s.updated(id, eval(right, s))
 
           // all others: like no-ops
           case _ => s
@@ -135,7 +139,10 @@ class SimpleSignAnalysis(cfg: ProgramCfg)(implicit declData: DeclarationData) ex
   /**
     * The basic Kleene fixpoint solver.
     */
-  def analyze(): lattice.Element = {
+  def analyze(): lattice.Element =
+    naiveFixedPoint()
+
+  def naiveFixedPoint() = {
     var x = lattice.bottom
     var t = x
     do {
@@ -143,5 +150,25 @@ class SimpleSignAnalysis(cfg: ProgramCfg)(implicit declData: DeclarationData) ex
       x = fun(x)
     } while (x != t)
     x
+  }
+
+  import scala.collection.mutable
+  def roundRobin() = {
+    val ds = domain.toIndexedSeq
+    val fs = mutable.ArraySeq(domain.toSeq.map(node => funsub(node, _)): _*)
+    val ss: mutable.ArraySeq[lattice.sublattice.Element] = mutable.ArraySeq(domain.toSeq.map(node => lattice.sublattice.bottom): _*)
+
+    def toLattice =
+      ss.zipWithIndex.map { case (s, i) => ds(i) -> s }.toMap
+
+    var counter = 0
+
+    do {
+      counter += 1
+      (0 until domain.size).foreach(i => ss.update(i, fs(i)(toLattice)))
+    } while (toLattice != fun(toLattice))
+
+    println(counter)
+    toLattice
   }
 }

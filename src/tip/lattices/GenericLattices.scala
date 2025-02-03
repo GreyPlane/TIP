@@ -125,6 +125,23 @@ class PairLattice[L1 <: Lattice, L2 <: Lattice](val sublattice1: L1, val sublatt
   def lub(x: Element, y: Element): Element = (sublattice1.lub(x._1, y._1), sublattice2.lub(x._2, y._2))
 }
 
+object X {
+
+  sealed trait Path
+  case object Z extends Path
+  case object O extends Path
+
+  sealed trait File
+  case object Open extends File
+  case object Close extends File
+
+  val p = new PowersetLattice[(Path, File)]()
+
+  def iso(x: MapLattice[Path, PowersetLattice[File]], y: PowersetLattice[(Path, File)]) = {
+
+  }
+}
+
 /**
   * A lattice of maps from a set of elements of type `A` to the lattice `sublattice`.
   * Bottom is the default value.
@@ -146,9 +163,9 @@ class PowersetLattice[A] extends Lattice {
 
   type Element = Set[A]
 
-  val bottom: Element = ??? //<--- Complete here
+  val bottom: Element = Set.empty[A]
 
-  def lub(x: Element, y: Element): Element = ??? //<--- Complete here
+  def lub(x: Element, y: Element): Element = x union y
 }
 
 /**

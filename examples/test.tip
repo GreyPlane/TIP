@@ -1,0 +1,11 @@
+inc(a) {
+  return a+1;
+}
+
+
+main() {
+ var x,y;
+ x = inc(0);
+ y = inc(87);
+ return x+y;
+}

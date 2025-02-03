@@ -69,10 +69,10 @@ trait ValueAnalysisMisc {
       case r: CfgStmtNode =>
         r.data match {
           // var declarations
-          case varr: AVarStmt => ??? //<--- Complete here
+          case varr: AVarStmt => s ++ varr.declIds.map(id => id -> valuelattice.top).toMap
 
           // assignments
-          case AAssignStmt(id: AIdentifier, right, _) => ??? //<--- Complete here
+          case AAssignStmt(id: AIdentifier, right, _) => s.updated(id, eval(right, s))
 
           // all others: like no-ops
           case _ => s
@@ -121,17 +121,39 @@ trait InterprocValueAnalysisFunctions extends MapLiftLatticeSolver[CfgNode] with
     * Overrides `funsub` from [[tip.solvers.MapLatticeSolver]] adding support for function calls and returns.
     */
   override def funsub(n: CfgNode, x: lattice.Element): liftedstatelattice.Element = {
-    //import cfg._ // gives easy access to the functionality in InterproceduralProgramCfg
+    import cfg._
+    // gives easy access to the functionality in InterproceduralProgramCfg
     import liftedstatelattice._
 
     new NormalizedCalls().assertContainsNode(n.data)
 
     n match {
       // function entry nodes
-      case funentry: CfgFunEntryNode => ??? //<--- Complete here
+      case funentry: CfgFunEntryNode =>
+        val s = funentry.callers.foldLeft(statelattice.bottom) { (acc, caller) =>
+          // State = Var -> Sign
+          // Lattice = Cfg -> State
+          val callerState = x(caller) match {
+            case liftedstatelattice.Lift(n) => n
+            case liftedstatelattice.Bottom => statelattice.bottom
+          }
+          val sw = evalArgs(funentry.data.params, caller.invocation.args, callerState)
+          statelattice.lub(acc, sw)
+        }
+
+        s
 
       // after-call nodes
-      case aftercall: CfgAfterCallNode => ??? //<--- Complete here
+      case aftercall: CfgAfterCallNode => {
+        val w = aftercall.calledExit.foldLeft(statelattice.bottom) { (acc, exitNode) =>
+          join(exitNode, x) match {
+            case liftedstatelattice.Bottom => statelattice.bottom
+            case liftedstatelattice.Lift(exitState) => statelattice.lub(acc, exitState)
+          }
+        }
+
+        x(aftercall.callNode).updated(aftercall.callNode.targetIdentifier, w(AstOps.returnId))
+      }
 
       // return node
       case CfgStmtNode(_, _, _, ret: AReturnStmt) =>
